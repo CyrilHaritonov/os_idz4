@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in serverAddr;
     char buffer[1024];
 
-    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (clientSocket == -1) {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
@@ -23,12 +23,10 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if (connect(clientSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) == -1) {
-        perror("Connection failed");
-        exit(EXIT_FAILURE);
-    }
+    sprintf(buffer, "hi i am client\n");
+    sendto(clientSocket, buffer, strlen(buffer), 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    memset(buffer, 0, sizeof(buffer));
 
-    printf("Connected to the server.\n");
 
     srand(time(NULL));
     if (strcmp(argv[3], "gardener") == 0) {
@@ -37,11 +35,13 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < 40; ++i) {
                 memset(buffer, 0, sizeof(buffer));
                 sprintf(buffer, "%d %d ", client_number, i);
-                ssize_t bytesSent = send(clientSocket, buffer, strlen(buffer), 0);
+                usleep(10000);
+                ssize_t bytesSent = sendto(clientSocket, buffer, strlen(buffer), 0, (struct sockaddr*) &serverAddr, sizeof(serverAddr));
                 if (bytesSent <= 0)
                     break;
                 memset(buffer, 0, sizeof(buffer));
-                ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+                socklen_t serverAddrLen = sizeof(serverAddr);
+                ssize_t bytesRead = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*) &serverAddr, &serverAddrLen);
                 if (bytesRead <= 0)
                     break;
                 if (buffer[0] == '1' || buffer[0] == '2') {
@@ -67,7 +67,8 @@ int main(int argc, char *argv[]) {
         }
         while (1) {
             memset(buffer, 0, sizeof(buffer));
-            ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+            socklen_t serverAddrLen = sizeof(serverAddr);
+            ssize_t bytesRead = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*) &serverAddr, &serverAddrLen);
             if (bytesRead <= 0)
                 break;
             char *end_ptr;
@@ -88,7 +89,7 @@ int main(int argc, char *argv[]) {
                 sprintf(buffer, "flower number %d does not need watering\n", flower_number);
                 flowers[flower_number]--;
             }
-            ssize_t bytesSent = send(clientSocket, buffer, strlen(buffer), 0);
+            ssize_t bytesSent = sendto(clientSocket, buffer, strlen(buffer), 0, (struct sockaddr*) &serverAddr, sizeof(serverAddr));
             if (bytesSent <= 0) {
                 break;
             }
@@ -96,7 +97,8 @@ int main(int argc, char *argv[]) {
     } else if (strcmp(argv[3], "observer") == 0) {
         while (1) {
             memset(buffer, 0, sizeof(buffer));
-            ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+            socklen_t serverAddrLen = sizeof(serverAddr);
+            ssize_t bytesRead = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr*) &serverAddr, &serverAddrLen);
             if (bytesRead <= 0)
                 break;
             printf("%s", buffer);
